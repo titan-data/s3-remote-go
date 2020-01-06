@@ -1,3 +1,6 @@
+/*
+ * Copyright The Titan Project Contributors.
+ */
 package s3
 
 import (
