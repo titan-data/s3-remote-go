@@ -6,6 +6,7 @@ package s3
 import (
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/titan-data/remote-sdk-go/remote"
 	"net/url"
 	"strings"
@@ -90,8 +91,53 @@ func (s s3webRemote) ToURL(properties map[string]interface{}) (string, map[strin
 	return u, params, nil
 }
 
+var newSession = session.NewSession
+
 func (s s3webRemote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+	result := map[string]interface{}{}
+	if remoteProperties["accessKey"] != nil {
+		result["accessKey"] = remoteProperties["accessKey"].(string)
+	}
+	if remoteProperties["secretKey"] != nil {
+		result["secretKey"] = remoteProperties["secretKey"].(string)
+	}
+	if remoteProperties["region"] != nil {
+		result["region"] = remoteProperties["region"].(string)
+	}
+
+	if result["accessKey"] == nil || result["secretKey"] == nil || result["region"] == nil {
+		sess, err := newSession()
+		if err != nil {
+			return nil, err
+		}
+
+		creds, err := sess.Config.Credentials.Get()
+		if err != nil {
+			return nil, err
+		}
+
+		if result["accessKey"] == nil && creds.AccessKeyID != "" {
+			result["accessKey"] = creds.AccessKeyID
+		}
+		if result["secretKey"] == nil && creds.SecretAccessKey != "" {
+			result["secretKey"] = creds.SecretAccessKey
+		}
+		if creds.SessionToken != "" {
+			result["sessionToken"] = creds.SessionToken
+		}
+		if result["region"] == nil && sess.Config.Region != nil {
+			result["region"] = *sess.Config.Region
+		}
+
+		if result["accessKey"] == nil || result["secretKey"] == nil {
+			return nil, errors.New("unable to determine AWS credentials")
+		}
+		if result["region"] == nil {
+			return nil, errors.New("unable to determine AWS region")
+		}
+	}
+
+	return result, nil
 }
 
 func init() {
