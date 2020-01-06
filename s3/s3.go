@@ -71,8 +71,23 @@ func (s s3webRemote) FromURL(url *url.URL, additionalProperties map[string]strin
 }
 
 func (s s3webRemote) ToURL(properties map[string]interface{}) (string, map[string]string, error) {
-	u := properties["url"].(string)
-	return strings.Replace(u, "http", "s3web", 1), map[string]string{}, nil
+	u := fmt.Sprintf("s3://%s", properties["bucket"])
+	if properties["path"] != nil {
+		u += fmt.Sprintf("/%s", properties["path"])
+	}
+
+	params := map[string]string{}
+	if properties["accessKey"] != nil {
+		params["accessKey"] = properties["accessKey"].(string)
+	}
+	if properties["secretKey"] != nil {
+		params["secretKey"] = properties["secretKey"].(string)
+	}
+	if properties["region"] != nil {
+		params["region"] = properties["region"].(string)
+	}
+
+	return u, params, nil
 }
 
 func (s s3webRemote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {

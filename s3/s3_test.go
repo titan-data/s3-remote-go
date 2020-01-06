@@ -113,30 +113,33 @@ func TestBadSecretKeyOnly(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestToURL(t *testing.T) {
+	r := remote.Get("s3")
+	u, props, _ := r.ToURL(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	assert.Equal(t, "s3://bucket/path", u)
+	assert.Empty(t, props)
+}
+
+func TestWithKeys(t *testing.T) {
+	r := remote.Get("s3")
+	u, props, _ := r.ToURL(map[string]interface{}{"bucket": "bucket", "path": "path",
+		"accessKey": "ACCESS", "secretKey": "SECRET"})
+	assert.Equal(t, "s3://bucket/path", u)
+	assert.Len(t, props, 2)
+	assert.Equal(t, "ACCESS", props["accessKey"])
+	assert.Equal(t, "SECRET", props["secretKey"])
+}
+
+func TestWithRegsion(t *testing.T) {
+	r := remote.Get("s3")
+	u, props, _ := r.ToURL(map[string]interface{}{"bucket": "bucket", "path": "path",
+		"region": "REGION"})
+	assert.Equal(t, "s3://bucket/path", u)
+	assert.Len(t, props, 1)
+	assert.Equal(t, "REGION", props["region"])
+}
+
 /*
-   "s3 remote to URI succeeds" {
-       val (uri, props) = client.toUri(mapOf("bucket" to "bucket", "path" to "path"))
-       uri shouldBe "s3://bucket/path"
-       props.size shouldBe 0
-   }
-
-   "s3 remote with keys to URI succeeds" {
-       val (uri, props) = client.toUri(mapOf("bucket" to "bucket", "path" to "path",
-               "accessKey" to "ACCESS", "secretKey" to "SECRET"))
-       uri shouldBe "s3://bucket/path"
-       props.size shouldBe 2
-       props["accessKey"] shouldBe "ACCESS"
-       props["secretKey"] shouldBe "*****"
-   }
-
-   "s3 remote with region to URI succeeds" {
-       val (uri, props) = client.toUri(mapOf("bucket" to "bucket", "path" to "path",
-               "region" to "REGION"))
-       uri shouldBe "s3://bucket/path"
-       props.size shouldBe 1
-       props["region"] shouldBe "REGION"
-   }
-
    "s3 get parameters succeeds" {
        val params = client.getParameters(mapOf("bucket" to "bucket", "path" to "path",
                "accessKey" to "ACCESS", "secretKey" to "SECRET", "region" to "REGION"))
@@ -186,54 +189,6 @@ func TestBadSecretKeyOnly(t *testing.T) {
 
 /*
 
-func TestNoPath(t *testing.T) {
-	r := remote.Get("s3web")
-	u, _ := url.Parse("s3web://host")
-	props, _ := r.FromURL(u, map[string]string{})
-	assert.Equal(t, "http://host", props["url"])
-}
-
-func TestBadProperty(t *testing.T) {
-	r := remote.Get("s3web")
-	u, _ := url.Parse("s3web://host")
-	_, err := r.FromURL(u, map[string]string{"a": "b"})
-	assert.NotNil(t, err)
-}
-
-func TestBadUser(t *testing.T) {
-	r := remote.Get("s3web")
-	u, _ := url.Parse("s3web://user@host/path")
-	_, err := r.FromURL(u, map[string]string{})
-	assert.NotNil(t, err)
-}
-
-func TestBadUserPassword(t *testing.T) {
-	r := remote.Get("s3web")
-	u, _ := url.Parse("s3web://user:password@host/path")
-	_, err := r.FromURL(u, map[string]string{})
-	assert.NotNil(t, err)
-}
-
-func TestBadNoHost(t *testing.T) {
-	r := remote.Get("s3web")
-	u, _ := url.Parse("s3web:///path")
-	_, err := r.FromURL(u, map[string]string{})
-	assert.NotNil(t, err)
-}
-
-func TestPort(t *testing.T) {
-	r := remote.Get("s3web")
-	u, _ := url.Parse("s3web://host:1023/object/path")
-	props, _ := r.FromURL(u, map[string]string{})
-	assert.Equal(t, "http://host:1023/object/path", props["url"])
-}
-
-func TestToURL(t *testing.T) {
-	r := remote.Get("s3web")
-	u, props, _ := r.ToURL(map[string]interface{}{"url": "http://host/path"})
-	assert.Equal(t, "s3web://host/path", u)
-	assert.Empty(t, props)
-}
 
 func TestParameters(t *testing.T) {
 	r := remote.Get("s3web")
