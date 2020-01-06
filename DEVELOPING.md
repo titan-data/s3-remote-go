@@ -5,17 +5,17 @@ For general information about contributing changes, see the
 
 ## How it Works
 
-Describe the internal mechanisms necessary for developers to understand how
-to get started making changes.
+The provider uses the Titan `remote-sdk-go` to provide interfaces for
+Titan to use.
 
 ## Building
 
-Describe how to build the project.
+Run `go build -v ./...`.
 
 ## Testing
 
-Describe how to test the project.
+Run `go test -v ./...`.
 
 ## Releasing
 
-Describe how to generate new releases.
+Push a tag of the form `v<X>.<Y>.<Z>`, and publish the draft release in GitHub.
