@@ -96,7 +96,7 @@ func (s s3webRemote) ToURL(properties map[string]interface{}) (string, map[strin
 	return u, params, nil
 }
 
-var newSession = session.NewSession
+var newSession = session.NewSessionWithOptions
 
 func (s s3webRemote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {
 	result := map[string]interface{}{}
@@ -111,7 +111,7 @@ func (s s3webRemote) GetParameters(remoteProperties map[string]interface{}) (map
 	}
 
 	if result["accessKey"] == nil || result["secretKey"] == nil || result["region"] == nil {
-		sess, err := newSession()
+		sess, err := newSession(session.Options{SharedConfigState: session.SharedConfigEnable})
 		if err != nil {
 			return nil, err
 		}
