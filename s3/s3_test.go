@@ -5,11 +5,13 @@ package s3
 
 import (
 	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/titan-data/remote-sdk-go/remote"
+	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -154,21 +156,61 @@ func TestGetParametersEnvironment(t *testing.T) {
 	assert.Equal(t, "TOKEN", props["sessionToken"])
 }
 
+func TestGetParametersFiles(t *testing.T) {
+	dir, err := ioutil.TempDir("", "s3.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	_ = os.Unsetenv("AWS_ACCESS_KEY_ID")
+	_ = os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+	_ = os.Unsetenv("AWS_REGION")
+	_ = os.Unsetenv("AWS_SESSION_TOKEN")
+
+	configFile := fmt.Sprintf("%s/config", dir)
+	credFile := fmt.Sprintf("%s/credentials", dir)
+
+	configContent := `
+[default]
+region = us-west-1
+`
+	credContent := `
+[default]
+aws_access_key_id = ACCESS2
+aws_secret_access_key = SECRET2
+aws_session_token = TOKEN2
+`
+
+	ioutil.WriteFile(configFile, []byte(configContent), 0600)
+	ioutil.WriteFile(credFile, []byte(credContent), 0600)
+
+	os.Setenv("AWS_CONFIG_FILE", configFile)
+	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", credFile)
+
+	r := remote.Get("s3")
+	props, _ := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+	assert.Equal(t, "ACCESS2", props["accessKey"])
+	assert.Equal(t, "SECRET2", props["secretKey"])
+	assert.Equal(t, "us-west-1", props["region"])
+	assert.Equal(t, "TOKEN2", props["sessionToken"])
+}
+
 func TestBadNewSession(t *testing.T) {
 	r := remote.Get("s3")
-	newSession = func(cfgs ...*aws.Config) (session *session.Session, err error) {
+	newSession = func(options session.Options) (session *session.Session, err error) {
 		return nil, errors.New("err")
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSession
+	newSession = session.NewSessionWithOptions
 }
 
 func TestBadConfigCredentials(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
 	p.On("Retrieve").Return(credentials.Value{}, errors.New("err"))
-	newSession = func(cfgs ...*aws.Config) (*session.Session, error) {
+	newSession = func(options session.Options) (*session.Session, error) {
 		return &session.Session{
 			Config: &aws.Config{
 				Credentials: credentials.NewCredentials(p),
@@ -177,14 +219,14 @@ func TestBadConfigCredentials(t *testing.T) {
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSession
+	newSession = session.NewSessionWithOptions
 }
 
 func TestBadCredentialsAccessKey(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
 	p.On("Retrieve").Return(credentials.Value{}, nil)
-	newSession = func(cfgs ...*aws.Config) (*session.Session, error) {
+	newSession = func(options session.Options) (*session.Session, error) {
 		return &session.Session{
 			Config: &aws.Config{
 				Credentials: credentials.NewCredentials(p),
@@ -193,7 +235,7 @@ func TestBadCredentialsAccessKey(t *testing.T) {
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSession
+	newSession = session.NewSessionWithOptions
 }
 
 func TestBadCredentialsRegion(t *testing.T) {
@@ -203,7 +245,7 @@ func TestBadCredentialsRegion(t *testing.T) {
 		AccessKeyID:     "ACCESS",
 		SecretAccessKey: "SECRET",
 	}, nil)
-	newSession = func(cfgs ...*aws.Config) (*session.Session, error) {
+	newSession = func(options session.Options) (*session.Session, error) {
 		return &session.Session{
 			Config: &aws.Config{
 				Credentials: credentials.NewCredentials(p),
@@ -212,5 +254,5 @@ func TestBadCredentialsRegion(t *testing.T) {
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSession
+	newSession = session.NewSessionWithOptions
 }
