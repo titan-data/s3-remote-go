@@ -1,0 +1,47 @@
+#
+# Copyright The Titan Project Contributors.
+#
+
+#
+# When a tag is pushed, build and upload the binary to the in-progress draft release.
+#
+name: Release
+
+on: create
+
+jobs:
+  upload:
+    name: Build and Upload
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.13.5'
+      - name: Get Draft Release
+        id: draft_release
+        run: |
+          echo -n ::set-output name=upload_url::
+          curl -sH "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/$GITHUB_REPOSITORY/releases | jq -rc '.[] | select(.draft) | .upload_url'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get Binary Name
+        id: binary_name
+        run: ./.github/get-binary-name s3 ${{ runner.os }}
+      - name: Build
+        run: go build -o build/s3 ./cmd/s3
+      - name: Test
+        run: go test ./...
+      - name: Upload Artifact
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.draft_release.outputs.upload_url }}
+          asset_path: ./build/s3
+          asset_name: ${{ steps.binary_name.outputs.binary_name }}
+          asset_content_type: application/octet-stream

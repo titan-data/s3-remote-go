@@ -15,11 +15,16 @@ import (
 type s3webRemote struct {
 }
 
-func (s s3webRemote) Type() string {
-	return "s3"
+func (s s3webRemote) Type() (string, error) {
+	return "s3", nil
 }
 
-func (s s3webRemote) FromURL(url *url.URL, additionalProperties map[string]string) (map[string]interface{}, error) {
+func (s s3webRemote) FromURL(rawUrl string, additionalProperties map[string]string) (map[string]interface{}, error) {
+	url, err := url.Parse(rawUrl)
+	if err != nil {
+		return nil, err
+	}
+
 	if url.Scheme != "s3" {
 		return nil, errors.New("invalid remote scheme")
 	}

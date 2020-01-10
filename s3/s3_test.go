@@ -10,20 +10,19 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/titan-data/remote-sdk-go/remote"
-	"net/url"
 	"os"
 	"testing"
 )
 
 func TestRegistered(t *testing.T) {
 	r := remote.Get("s3")
-	assert.Equal(t, "s3", r.Type())
+	ret, _ := r.Type()
+	assert.Equal(t, "s3", ret)
 }
 
 func TestFromURL(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://bucket/object/path")
-	props, _ := r.FromURL(u, map[string]string{})
+	props, _ := r.FromURL("s3://bucket/object/path", map[string]string{})
 	assert.Equal(t, "bucket", props["bucket"])
 	assert.Equal(t, "object/path", props["path"])
 	assert.Nil(t, props["accessKey"])
@@ -33,8 +32,7 @@ func TestFromURL(t *testing.T) {
 
 func TestNoPath(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://bucket")
-	props, _ := r.FromURL(u, map[string]string{})
+	props, _ := r.FromURL("s3://bucket", map[string]string{})
 	assert.Equal(t, "bucket", props["bucket"])
 	assert.Nil(t, props["path"])
 	assert.Nil(t, props["accessKey"])
@@ -44,57 +42,49 @@ func TestNoPath(t *testing.T) {
 
 func TestBadScheme(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3")
-	_, err := r.FromURL(u, map[string]string{})
+	_, err := r.FromURL("s3", map[string]string{})
 	assert.NotNil(t, err)
 }
 
 func TestBadSchemeName(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("foo://bucket/path")
-	_, err := r.FromURL(u, map[string]string{})
+	_, err := r.FromURL("foo://bucket/path", map[string]string{})
 	assert.NotNil(t, err)
 }
 
 func TestBadProperty(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://bucket/object/path")
-	_, err := r.FromURL(u, map[string]string{"foo": "bar"})
+	_, err := r.FromURL("s3://bucket/object/path", map[string]string{"foo": "bar"})
 	assert.NotNil(t, err)
 }
 
 func TestBadUser(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://user@bucket/object/path")
-	_, err := r.FromURL(u, map[string]string{})
+	_, err := r.FromURL("s3://user@bucket/object/path", map[string]string{})
 	assert.NotNil(t, err)
 }
 
 func TestBadUserPassword(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://user:password@bucket/object/path")
-	_, err := r.FromURL(u, map[string]string{})
+	_, err := r.FromURL("s3://user:password@bucket/object/path", map[string]string{})
 	assert.NotNil(t, err)
 }
 
 func TestBadPort(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://bucket:80/object/path")
-	_, err := r.FromURL(u, map[string]string{})
+	_, err := r.FromURL("s3://bucket:80/object/path", map[string]string{})
 	assert.NotNil(t, err)
 }
 
 func TestBadMissingBucket(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3:///object/path")
-	_, err := r.FromURL(u, map[string]string{})
+	_, err := r.FromURL("s3:///object/path", map[string]string{})
 	assert.NotNil(t, err)
 }
 
 func TestProperties(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://bucket/object/path")
-	props, _ := r.FromURL(u, map[string]string{
+	props, _ := r.FromURL("s3://bucket/object/path", map[string]string{
 		"accessKey": "ACCESS", "secretKey": "SECRET", "region": "REGION",
 	})
 	assert.Equal(t, "bucket", props["bucket"])
@@ -106,15 +96,13 @@ func TestProperties(t *testing.T) {
 
 func TestBadAccessKeyOnly(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://bucket/object/path")
-	_, err := r.FromURL(u, map[string]string{"accessKey": "ACCESS"})
+	_, err := r.FromURL("s3://bucket/object/path", map[string]string{"accessKey": "ACCESS"})
 	assert.NotNil(t, err)
 }
 
 func TestBadSecretKeyOnly(t *testing.T) {
 	r := remote.Get("s3")
-	u, _ := url.Parse("s3://bucket/object/path")
-	_, err := r.FromURL(u, map[string]string{"secretKey": "ACCESS"})
+	_, err := r.FromURL("s3://bucket/object/path", map[string]string{"secretKey": "ACCESS"})
 	assert.NotNil(t, err)
 }
 
