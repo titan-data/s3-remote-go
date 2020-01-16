@@ -29,6 +29,7 @@ github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5a
 github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd/go.mod h1:9bjs9uLqI8l75knNv3lV1kA55veR+WUPSiKIWcQHudI=
 github.com/hashicorp/go-hclog v0.10.1 h1:uyt/l0dWjJ879yiAu+T7FG3/6QX+zwm4bQ8P7XsYt3o=
 github.com/hashicorp/go-hclog v0.10.1/go.mod h1:whpDNt7SSdeAju8AWKIWsul05p54N/39EeqMAyrmvFQ=
+github.com/hashicorp/go-hclog v0.11.0/go.mod h1:whpDNt7SSdeAju8AWKIWsul05p54N/39EeqMAyrmvFQ=
 github.com/hashicorp/go-plugin v1.0.1 h1:4OtAfUGbnKC6yS48p0CtMX2oFYtzFZVv6rok3cRWgnE=
 github.com/hashicorp/go-plugin v1.0.1/go.mod h1:++UyYGoz3o5w9ZzAdZxtQKrWWP+iqPBn3cQptSMzBuY=
 github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb h1:b5rjCoWHc7eqmAS4/qyk21ZsHyb6Mxv/jykxvNTkU4M=
@@ -59,6 +60,8 @@ github.com/titan-data/remote-sdk-go v0.0.3 h1:kGLc7JP7znTcXyl3gRML2jEST99ebdhz0C
 github.com/titan-data/remote-sdk-go v0.0.3/go.mod h1:b4McaOFiLYWv2/wCQW/sE2BcCSNz/Ae6iKKEtqw703w=
 github.com/titan-data/remote-sdk-go v0.1.0 h1:Xab4sduqyGdo04eJ5mQ2lIfAYZDjHJ4AzlK4oJ5EqqE=
 github.com/titan-data/remote-sdk-go v0.1.0/go.mod h1:u7w3Olu3EtjoFcHzxUOzelxedey4q2nveuKLvgRO7tg=
+github.com/titan-data/remote-sdk-go v0.2.0 h1:fkw/4AqY8XAnhh6h/u1SUvv5eIoPIVAabLhMahjpuLo=
+github.com/titan-data/remote-sdk-go v0.2.0/go.mod h1:IYCrMWL1hFGoYusrTHgseG/bLVuY72LpQSSdGOrcHb4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
