@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/titan-data/remote-sdk-go/remote"
 	"io/ioutil"
@@ -182,35 +184,37 @@ aws_secret_access_key = SECRET2
 aws_session_token = TOKEN2
 `
 
-	ioutil.WriteFile(configFile, []byte(configContent), 0600)
-	ioutil.WriteFile(credFile, []byte(credContent), 0600)
+	err1 := ioutil.WriteFile(configFile, []byte(configContent), 0600)
+	err2 := ioutil.WriteFile(credFile, []byte(credContent), 0600)
+	if assert.NoError(t, err1) && assert.NoError(t, err2) {
 
-	os.Setenv("AWS_CONFIG_FILE", configFile)
-	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", credFile)
+		_ = os.Setenv("AWS_CONFIG_FILE", configFile)
+		_ = os.Setenv("AWS_SHARED_CREDENTIALS_FILE", credFile)
 
-	r := remote.Get("s3")
-	props, _ := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
-	assert.Equal(t, "ACCESS2", props["accessKey"])
-	assert.Equal(t, "SECRET2", props["secretKey"])
-	assert.Equal(t, "us-west-1", props["region"])
-	assert.Equal(t, "TOKEN2", props["sessionToken"])
+		r := remote.Get("s3")
+		props, _ := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
+		assert.Equal(t, "ACCESS2", props["accessKey"])
+		assert.Equal(t, "SECRET2", props["secretKey"])
+		assert.Equal(t, "us-west-1", props["region"])
+		assert.Equal(t, "TOKEN2", props["sessionToken"])
+	}
 }
 
 func TestBadNewSession(t *testing.T) {
 	r := remote.Get("s3")
-	newSession = func(options session.Options) (session *session.Session, err error) {
+	newSessionWithOptions = func(options session.Options) (session *session.Session, err error) {
 		return nil, errors.New("err")
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSessionWithOptions
+	newSessionWithOptions = session.NewSessionWithOptions
 }
 
 func TestBadConfigCredentials(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
 	p.On("Retrieve").Return(credentials.Value{}, errors.New("err"))
-	newSession = func(options session.Options) (*session.Session, error) {
+	newSessionWithOptions = func(options session.Options) (*session.Session, error) {
 		return &session.Session{
 			Config: &aws.Config{
 				Credentials: credentials.NewCredentials(p),
@@ -219,14 +223,14 @@ func TestBadConfigCredentials(t *testing.T) {
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSessionWithOptions
+	newSessionWithOptions = session.NewSessionWithOptions
 }
 
 func TestBadCredentialsAccessKey(t *testing.T) {
 	r := remote.Get("s3")
 	p := new(MockProvider)
 	p.On("Retrieve").Return(credentials.Value{}, nil)
-	newSession = func(options session.Options) (*session.Session, error) {
+	newSessionWithOptions = func(options session.Options) (*session.Session, error) {
 		return &session.Session{
 			Config: &aws.Config{
 				Credentials: credentials.NewCredentials(p),
@@ -235,7 +239,7 @@ func TestBadCredentialsAccessKey(t *testing.T) {
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSessionWithOptions
+	newSessionWithOptions = session.NewSessionWithOptions
 }
 
 func TestBadCredentialsRegion(t *testing.T) {
@@ -245,7 +249,7 @@ func TestBadCredentialsRegion(t *testing.T) {
 		AccessKeyID:     "ACCESS",
 		SecretAccessKey: "SECRET",
 	}, nil)
-	newSession = func(options session.Options) (*session.Session, error) {
+	newSessionWithOptions = func(options session.Options) (*session.Session, error) {
 		return &session.Session{
 			Config: &aws.Config{
 				Credentials: credentials.NewCredentials(p),
@@ -254,5 +258,195 @@ func TestBadCredentialsRegion(t *testing.T) {
 	}
 	_, err := r.GetParameters(map[string]interface{}{"bucket": "bucket", "path": "path"})
 	assert.NotNil(t, err)
-	newSession = session.NewSessionWithOptions
+	newSessionWithOptions = session.NewSessionWithOptions
+}
+
+func TestMetadataKey(t *testing.T) {
+	k := getMetadataKey(aws.String("foo"))
+	assert.Equal(t, "foo/titan", k)
+}
+
+func TestMetadataKeyNil(t *testing.T) {
+	k := getMetadataKey(nil)
+	assert.Equal(t, "titan", k)
+}
+
+func TestKeyNoPath(t *testing.T) {
+	k := getKey(map[string]interface{}{}, aws.String("id"))
+	assert.Equal(t, "id", *k)
+}
+
+func TestKeyNoPathNoCommit(t *testing.T) {
+	k := getKey(map[string]interface{}{}, nil)
+	assert.Nil(t, k)
+}
+
+func TestKeyPath(t *testing.T) {
+	k := getKey(map[string]interface{}{"path": "one/two"}, aws.String("three"))
+	assert.Equal(t, "one/two/three", *k)
+}
+
+func TestKeyPathNoCommit(t *testing.T) {
+	k := getKey(map[string]interface{}{"path": "one/two"}, nil)
+	assert.Equal(t, "one/two", *k)
+}
+
+func TestValidateRemoteAllProperties(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "secretKey": "secret",
+		"accessKey": "access", "path": "/path", "region": "region"})
+	assert.NoError(t, err)
+}
+
+func TestValidateRemoteOnlyRequired(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket"})
+	assert.NoError(t, err)
+}
+
+func TestValidateRemoteMissingRequired(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateRemote(map[string]interface{}{})
+	assert.Error(t, err)
+}
+
+func TestValidateRemoteInvalidPoperty(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "foo": "bar"})
+	assert.Error(t, err)
+}
+
+func TestValidateRemoteOnlyAccessKey(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "accessKey": "access"})
+	assert.Error(t, err)
+}
+
+func TestValidateRemoteOnlySecretKey(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateRemote(map[string]interface{}{"bucket": "bucket", "secretKey": "secret"})
+	assert.Error(t, err)
+}
+
+func TestValidateParametersEmpty(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateParameters(map[string]interface{}{})
+	assert.NoError(t, err)
+}
+
+func TestValidateParametersAll(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateParameters(map[string]interface{}{"accessKey": "access", "secretKey": "secret",
+		"region": "region", "sessionToken": "token"})
+	assert.NoError(t, err)
+}
+
+func TestValidateParametersInvalid(t *testing.T) {
+	r := remote.Get("s3")
+	err := r.ValidateParameters(map[string]interface{}{"foo": "bar"})
+	assert.Error(t, err)
+}
+
+var mockConfig *aws.Config
+
+func mockS3() {
+	newSession = func(cfgs ...*aws.Config) (*session.Session, error) {
+		mockConfig = cfgs[0]
+		return &session.Session{
+			Config: mockConfig,
+		}, nil
+	}
+	s3New = func(p client.ConfigProvider, cfgs ...*aws.Config) *s3.S3 {
+		return &s3.S3{
+			Client: &client.Client{
+				Config: *mockConfig,
+			},
+		}
+	}
+}
+
+func restoreS3() {
+	newSession = session.NewSession
+	s3New = s3.New
+}
+
+func TestGetS3(t *testing.T) {
+	mockS3()
+	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
+		map[string]interface{}{})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "region", *mockConfig.Region)
+		creds, err := mockConfig.Credentials.Get()
+		if assert.NoError(t, err) {
+			assert.Equal(t, "access", creds.AccessKeyID)
+			assert.Equal(t, "secret", creds.SecretAccessKey)
+		}
+	}
+	restoreS3()
+}
+
+func TestGetS3Parameters(t *testing.T) {
+	mockS3()
+	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
+		map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region", "sessionToken": "token"})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "region", *mockConfig.Region)
+		creds, err := mockConfig.Credentials.Get()
+		if assert.NoError(t, err) {
+			assert.Equal(t, "access", creds.AccessKeyID)
+			assert.Equal(t, "secret", creds.SecretAccessKey)
+			assert.Equal(t, "token", creds.SessionToken)
+		}
+	}
+	restoreS3()
+}
+
+func TestGetS3MissingRegion(t *testing.T) {
+	mockS3()
+	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
+		map[string]interface{}{"accessKey": "access", "secretKey": "secret"})
+	assert.Error(t, err)
+	restoreS3()
+}
+
+func TestGetS3MissingAccessKey(t *testing.T) {
+	mockS3()
+	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
+		map[string]interface{}{"region": "region", "secretKey": "secret"})
+	assert.Error(t, err)
+	restoreS3()
+}
+
+func TestGetS3MissingSecretKey(t *testing.T) {
+	mockS3()
+	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
+		map[string]interface{}{"region": "region", "accessKey": "access"})
+	assert.Error(t, err)
+	restoreS3()
+}
+
+func TestGetS3BadToken(t *testing.T) {
+	mockS3()
+	_, err := getS3(map[string]interface{}{"bucket": "bucket"},
+		map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region", "sessionToken": 4})
+	assert.Error(t, err)
+	restoreS3()
+}
+
+func TestGetS3BadRemote(t *testing.T) {
+	mockS3()
+	_, err := getS3(map[string]interface{}{"bucket": "bucket", "accessKey": 4},
+		map[string]interface{}{"secretKey": "secret", "region": "region"})
+	assert.Error(t, err)
+	restoreS3()
+}
+
+func TestNewSessionFails(t *testing.T) {
+	newSession = func(cfgs ...*aws.Config) (*session.Session, error) {
+		return nil, errors.New("error")
+	}
+	_, err := getS3(map[string]interface{}{"accessKey": "access", "secretKey": "secret", "region": "region"},
+		map[string]interface{}{})
+	assert.Error(t, err)
+	newSession = session.NewSession
 }

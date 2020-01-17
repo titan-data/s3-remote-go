@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/titan-data/remote-sdk-go/remote"
 	"io"
 	"io/ioutil"
@@ -141,8 +142,10 @@ func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]s
 	return u, params, nil
 }
 
+// AWS SDK methods visible for testing
 var newSessionWithOptions = session.NewSessionWithOptions
 var newSession = session.NewSession
+var s3New = s3.New
 
 func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {
 	result := map[string]interface{}{}
@@ -217,29 +220,52 @@ func (s s3Remote) ValidateParameters(parameters map[string]interface{}) error {
 	return remote.ValidateFields(parameters, []string{}, []string{"accessKey", "secretKey", "region", "sessionToken"})
 }
 
+func getRemoteValue(remote map[string]interface{}, parameters map[string]interface{}, field string) (string, error) {
+	if raw, ok := parameters[field]; ok {
+		if value, ok := raw.(string); ok {
+			return value, nil
+		} else {
+			return "", fmt.Errorf("invalid parameter, '%s' must be a string", field)
+		}
+	}
+
+	if remote == nil {
+		return "", nil
+	}
+
+	if raw, ok := remote[field]; ok {
+		if value, ok := raw.(string); ok {
+			return value, nil
+		} else {
+			return "", fmt.Errorf("invalid parameter, '%s' must be a string", field)
+		}
+	}
+	return "", fmt.Errorf("missing parameter '%s'", field)
+}
+
 /*
  * Get an instance of the S3 service based on the remote configuration and parameters.
  */
-func getS3(remote map[string]interface{}, parameters map[string]interface{}) (*s3.S3, error) {
-	var accessKey, secretKey, sessionToken, region string
-	var ok bool
+func getS3(remote map[string]interface{}, parameters map[string]interface{}) (s3iface.S3API, error) {
+	accessKey, err := getRemoteValue(remote, parameters, "accessKey")
+	if err != nil {
+		return nil, err
+	}
 
-	if accessKey, ok = parameters["accessKey"].(string); !ok {
-		if accessKey, ok = remote["accessKey"].(string); !ok {
-			return nil, errors.New("missing access key")
-		}
+	secretKey, err := getRemoteValue(remote, parameters, "secretKey")
+	if err != nil {
+		return nil, err
 	}
-	if secretKey, ok = parameters["secretKey"].(string); !ok {
-		if secretKey, ok = remote["secretKey"].(string); !ok {
-			return nil, errors.New("missing secret key")
-		}
+
+	region, err := getRemoteValue(remote, parameters, "region")
+	if err != nil {
+		return nil, err
 	}
-	if region, ok = parameters["region"].(string); !ok {
-		if region, ok = remote["region"].(string); !ok {
-			return nil, errors.New("missing region")
-		}
+
+	sessionToken, err := getRemoteValue(nil, parameters, "sessionToken")
+	if err != nil {
+		return nil, err
 	}
-	sessionToken = parameters["sessionToken"].(string)
 
 	sess, err := newSession(&aws.Config{
 		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, sessionToken),
@@ -249,7 +275,7 @@ func getS3(remote map[string]interface{}, parameters map[string]interface{}) (*s
 		return nil, err
 	}
 
-	return s3.New(sess), nil
+	return s3New(sess), nil
 }
 
 /*
