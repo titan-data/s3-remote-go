@@ -27,9 +27,11 @@ func (p *MockProvider) IsExpired() bool {
 type MockS3 struct {
 	s3iface.S3API
 	err error
+	*s3.GetObjectInput
 	s3.GetObjectOutput
 }
 
 func (m *MockS3) GetObject(in *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
+	m.GetObjectInput = in
 	return &m.GetObjectOutput, m.err
 }

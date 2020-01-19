@@ -146,6 +146,7 @@ func (s s3Remote) ToURL(properties map[string]interface{}) (string, map[string]s
 var newSessionWithOptions = session.NewSessionWithOptions
 var newSession = session.NewSession
 var s3New = s3.New
+var mockS3 s3iface.S3API
 
 func (s s3Remote) GetParameters(remoteProperties map[string]interface{}) (map[string]interface{}, error) {
 	result := map[string]interface{}{}
@@ -247,6 +248,10 @@ func getRemoteValue(remote map[string]interface{}, parameters map[string]interfa
  * Get an instance of the S3 service based on the remote configuration and parameters.
  */
 func getS3(remote map[string]interface{}, parameters map[string]interface{}) (s3iface.S3API, error) {
+	if mockS3 != nil {
+		return mockS3, nil
+	}
+
 	accessKey, err := getRemoteValue(remote, parameters, "accessKey")
 	if err != nil {
 		return nil, err
@@ -343,7 +348,7 @@ type MetadataCommit struct {
  * List all commits in a repository. This operates by processing the metadata file at the root of the S3 path. Each
  * line is a JSON object with an "id" field and "properties" field.
  */
-func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[string]interface{}, _ []remote.Tag) ([]remote.Commit, error) {
+func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[string]interface{}, tags []remote.Tag) ([]remote.Commit, error) {
 	var ret []remote.Commit
 	metadata, err := getMetadataContent(properties, parameters)
 	if err != nil {
@@ -356,11 +361,13 @@ func (s s3Remote) ListCommits(properties map[string]interface{}, parameters map[
 		if (line) != "" {
 			commit := MetadataCommit{}
 			err = json.Unmarshal([]byte(line), &commit)
-			if err != nil && commit.Properties != nil && commit.Id != "" {
+			if err == nil && commit.Properties != nil && commit.Id != "" && remote.MatchTags(commit.Properties, tags) {
 				ret = append(ret, remote.Commit{Id: commit.Id, Properties: commit.Properties})
 			}
 		}
 	}
+
+	remote.SortCommits(ret)
 
 	return ret, nil
 }
