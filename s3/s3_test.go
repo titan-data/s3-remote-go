@@ -522,7 +522,6 @@ func TestGetMetadataMissing(t *testing.T) {
 		}
 
 	}
-
 	mockS3 = nil
 }
 
@@ -532,7 +531,6 @@ func TestGetMetadataOtherError(t *testing.T) {
 	}
 	_, err := getMetadataContent(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{})
 	assert.Error(t, err)
-
 	mockS3 = nil
 }
 
@@ -600,5 +598,79 @@ func TestListCommitsError(t *testing.T) {
 	r := remote.Get("s3")
 	_, err := r.ListCommits(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, []remote.Tag{{Key: "a"}})
 	assert.Error(t, err)
+	mockS3 = nil
+}
+
+func TestGetCommitBadS3(t *testing.T) {
+	installMockS3()
+	r := remote.Get("s3")
+	_, err := r.GetCommit(map[string]interface{}{}, map[string]interface{}{}, "id")
+	assert.Error(t, err)
+	restoreS3()
+}
+
+func TestGetCommitMissing(t *testing.T) {
+	mockS3 = &MockS3{
+		err: awserr.New(s3.ErrCodeNoSuchKey, "error", nil),
+	}
+	r := remote.Get("s3")
+	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	if assert.NoError(t, err) {
+		assert.Nil(t, commit)
+	}
+	mockS3 = nil
+}
+
+func TestGetCommitOtherError(t *testing.T) {
+	mockS3 = &MockS3{
+		err: awserr.New(s3.ErrCodeNoSuchBucket, "error", nil),
+	}
+	r := remote.Get("s3")
+	_, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	assert.Error(t, err)
+	mockS3 = nil
+}
+
+func TestGetCommitMissingMetadata(t *testing.T) {
+	mockS3 = &MockS3{
+		GetObjectOutput: s3.GetObjectOutput{
+			Metadata: map[string]*string{},
+		},
+	}
+	r := remote.Get("s3")
+	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	if assert.NoError(t, err) {
+		assert.Nil(t, commit)
+	}
+	mockS3 = nil
+}
+
+func TestGetCommitBadJson(t *testing.T) {
+	mockS3 = &MockS3{
+		GetObjectOutput: s3.GetObjectOutput{
+			Metadata: map[string]*string{"io.titan-data": aws.String("notjson")},
+		},
+	}
+	r := remote.Get("s3")
+	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	if assert.NoError(t, err) {
+		assert.Nil(t, commit)
+	}
+	mockS3 = nil
+}
+
+func TestGetCommit(t *testing.T) {
+	mockS3 = &MockS3{
+		GetObjectOutput: s3.GetObjectOutput{
+			Metadata: map[string]*string{"io.titan-data": aws.String(`
+{"id": "two", "properties": {"timestamp": "2019-09-20T13:45:37Z", "tags": { "c": "d" }}}
+`)},
+		},
+	}
+	r := remote.Get("s3")
+	commit, err := r.GetCommit(map[string]interface{}{"bucket": "bucket", "path": "path"}, map[string]interface{}{}, "id")
+	if assert.NoError(t, err) {
+		assert.Equal(t, "2019-09-20T13:45:37Z", commit.Properties["timestamp"])
+	}
 	mockS3 = nil
 }
